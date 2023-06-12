@@ -267,7 +267,7 @@ function obj:start()
     end
 
     wf:subscribe(hs.window.filter.windowFocused, function(window, name, ev)
-        if name == "Xcode" then
+        if name == "Xcode" and window:subrole() == "AXStandardWindow" then
             et:start()
             locateBreakpointsButton()
         else
