@@ -8,12 +8,13 @@ obj.__index = obj
 
 -- Metadata
 obj.name = "XcodeVimTricks"
-obj.version = "0.0.1"
+obj.version = "0.0.2"
 obj.author = "Ezhik <i@ezhik.me>"
 
 function p(v) print(hs.inspect.inspect(v)) end
 
 -- i hate this
+-- the bar is semi-transparent too, making everything worse.
 local modeColors = {
     normal = {
         { -- light mode
@@ -26,11 +27,6 @@ local modeColors = {
             green = 0.23137254901961,
             red = 0.21960784313725
         },
-        { -- dark mode 2? this was in a standalone xcode window for some reason.
-            blue = 0.26274509803922,
-            green = 0.24313725490196,
-            red = 0.22745098039216
-        }
     },
     visual = {
         { -- light mode
@@ -43,11 +39,6 @@ local modeColors = {
             green = 0.32941176470588,
             red = 0.21176470588235
         },
-        { -- dark mode 2? this was in a standalone xcode window for some reason.
-            blue = 0.38039215686275,
-            green = 0.34117647058824,
-            red = 0.21960784313725
-        }
     },
     insert = {
         { -- light mode
@@ -60,13 +51,15 @@ local modeColors = {
             green = 0.20392156862745,
             red = 0.30980392156863
         },
-        { -- dark mode 2? this was in a standalone xcode window for some reason.
-            blue = 0.4078431372549,
-            green = 0.2156862745098,
-            red = 0.31764705882353
-        }
     }
 }
+-- nasty approximate color comparison
+function approxEq(a, b)
+    return math.abs((a - b) * 1000) < 50
+end
+function colorApproxEqual(c1, c2)
+    return approxEq(c1.red, c2.red) and approxEq(c1.green, c2.green) and approxEq(c1.blue, c2.blue)
+end
 
 -- this button is used as the hint to locate the Vim mode in the debug bar (which is not visible in AX ;_;)
 -- there can be multiple buttons so i'm using this instead of the bar itself
@@ -78,14 +71,10 @@ function locateBreakpointsButton()
         end,
         function(el)
             -- this most likely does not work if Xcode is not in English
-            return el.AXDescription == "Breakpoints" and el.AXParent.AXDescription == "debug bar"
+            return (el.AXDescription == "Breakpoints" or el.AXIdentifier == "Execution") and el.AXParent.AXDescription == "debug bar"
         end,
         { count = 1 }
     )
-end
-
-function r(n)
-    return math.floor(n * 1000)
 end
 
 local vimModeCache = nil
@@ -120,15 +109,15 @@ function getVimMode()
 
     for mode, colors in pairs(modeColors) do
         for _, mc in pairs(colors) do
-            if r(mc.red) == r(cc.red) and r(mc.green) == r(cc.green) and r(mc.blue) == r(cc.blue) then
+            if colorApproxEqual(mc, cc) then
                 vimModeCache = mode
-                -- p(vimModeCache)
+                -- p(mode)
                 return mode
             end
         end
     end
 
-    -- we shouldn't ever be here but if we are just pretend we're in insert mode to disable all tricks
+    -- we shouldn't ever be here but if we are we were unable to figure out the mode so just pretend we're in insert mode to disable all tricks
     return "insert"
 end
 
@@ -144,9 +133,12 @@ local escKey = hs.keycodes.map.escape
 local wf = hs.window.filter.new():setAppFilter("Xcode", { focused = true })
 local et = hs.eventtap.new({hs.eventtap.event.types.keyDown, hs.eventtap.event.types.mouseMoved, hs.eventtap.event.types.gesture, hs.eventtap.event.types.scrollWheel}, function(ev)
     local currentElement = systemElement.AXFocusedUIElement
+    -- p(currentElement:allAttributeValues())
+
     -- only activate if in the actual vim-mode source code editor
     -- this most likely does not work if Xcode is not in English
     if currentElement ~= nil and currentElement.AXDescription == "Source Editor" then
+        -- p(getVimMode())
         -- p(currentElement:allAttributeValues())
         keyCount = keyCount + 1
 
