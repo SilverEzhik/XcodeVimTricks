@@ -90,6 +90,10 @@ function getVimMode()
         return "insert"
     end
     local bf = breakpointsButton.AXFrame
+    if bf == nil then
+        locateBreakpointsButton()
+        return "insert"
+    end
 
     local xf = window:frame()
     -- p(bf)
@@ -262,6 +266,21 @@ function obj:start()
         if name == "Xcode" and window:subrole() == "AXStandardWindow" then
             et:start()
             locateBreakpointsButton()
+
+            -- check for broken keyboard event taps
+            -- ps axo pid,command | grep "$(ioreg -l -w 0 | grep SecureInput | sed 's/^[^(]*//' | tr -d '(){}' | tr ',' '\n' | grep 'PID' | awk -F= '{print $2}' | sort | uniq | head -1)" | grep -v grep
+            -- https://github.com/Hammerspoon/hammerspoon/issues/1743
+            if hs.eventtap.isSecureInputEnabled() then
+                hs.task.new("/bin/sh", function() end, function (_, cmd, _)
+                    p(cmd)
+                    if string.match(cmd, "loginwindow") then
+                        hs.notify.show("loginwindow is blocking Xcode Vim Tricks", "", "You might need to log out and back in to fix this.")
+                    else
+                        hs.notify.show("An application is blocking Xcode Vim Tricks", "", "Secure input enabled by: " .. cmd)
+                    end
+                    return false
+                end, {"-c", "ps axo pid,command | grep \"$(ioreg -l -w 0 | grep SecureInput | sed 's/^[^(]*//' | tr -d '(){}' | tr ',' '\n' | grep 'PID' | awk -F= '{print $2}' | sort | uniq)\" | grep -v grep | head -1 | awk '{print $2}'"}):start()
+            end
         else
             et:stop()
             keys = {}
